@@ -1,0 +1,8 @@
+{
+  "buildCommand": "git clone https://github.com/azolotarov-tech/insart-knowledge-base repo || true",
+  "functions": {
+    "app.py": {
+      "runtime": "vercel-python@4"
+    }
+  }
+}

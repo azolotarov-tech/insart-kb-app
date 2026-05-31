@@ -51,16 +51,19 @@ def inject_globals():
 # ── repo ──────────────────────────────────────────────────────────────────────
 
 def init_repo():
-    if (REPO_DIR / ".git").exists():
-        subprocess.run(["git", "-C", str(REPO_DIR), "pull"], capture_output=True)
-    else:
-        REPO_DIR.mkdir(parents=True, exist_ok=True)
-        result = subprocess.run(
-            ["git", "clone", REPO_URL, str(REPO_DIR)],
-            capture_output=True, text=True,
-        )
-        if result.returncode != 0:
-            app.logger.warning("git clone failed: %s", result.stderr)
+    try:
+        if (REPO_DIR / ".git").exists():
+            subprocess.run(["git", "-C", str(REPO_DIR), "pull"], capture_output=True)
+        else:
+            REPO_DIR.mkdir(parents=True, exist_ok=True)
+            result = subprocess.run(
+                ["git", "clone", REPO_URL, str(REPO_DIR)],
+                capture_output=True, text=True,
+            )
+            if result.returncode != 0:
+                app.logger.warning("git clone failed: %s", result.stderr)
+    except FileNotFoundError:
+        app.logger.warning("git not available, skipping repo init (expected on Vercel)")
 
 
 # ── markdown ──────────────────────────────────────────────────────────────────
