@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block main %}
+<!-- ARTICLE -->
+<main class="content">
+  <div class="breadcrumb">
+    <a href="/">Home</a>
+    <span class="sep">/</span>
+    <a href="/{{ section_key }}">{{ sec.label }}</a>
+    {% if subsection %}
+    <span class="sep">/</span>
+    <span>{{ subsection | replace('-', ' ') | title }}</span>
+    {% endif %}
+    <span class="sep">/</span>
+    <span>{{ page_title }}</span>
+  </div>
+
+  <h1>{{ page_title }}</h1>
+
+  {% if fm.get('tags') or fm.get('date') or fm.get('experts') or fm.get('client') or fm.get('status') %}
+  <div class="meta-row">
+    {% if fm.get('tags') %}
+      {% for tag in fm.tags %}
+      <span class="tag">{{ tag }}</span>
+      {% endfor %}
+    {% endif %}
+
+    {% if fm.get('date') %}
+    <span class="meta-pair">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>
+      </svg>
+      {{ fm.date }}
+    </span>
+    {% endif %}
+
+    {% if fm.get('client') %}
+    <span class="meta-pair">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M3 21h18M9 8h1m5 0h1M9 12h1m5 0h1M9 16h1m5 0h1M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"/>
+      </svg>
+      {{ fm.client }}
+    </span>
+    {% endif %}
+
+    {% if fm.get('experts') %}
+    <span class="meta-pair">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+      </svg>
+      {% if fm.experts is string %}
+        {{ fm.experts }}
+      {% else %}
+        {{ fm.experts | join(', ') }}
+      {% endif %}
+    </span>
+    {% endif %}
+
+    {% if fm.get('status') %}
+    <span class="tag" style="background: var(--surface-2); color: var(--text-faint);">{{ fm.status }}</span>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {{ html_body | safe }}
+</main>
+
+<!-- RIGHT TOC -->
+{% if toc %}
+<aside class="toc">
+  <div class="toc-title">On this page</div>
+  <ul>
+    {% for item in toc %}
+    <li><a href="#{{ item.id }}" {% if loop.first %}class="active"{% endif %}>{{ item.text }}</a></li>
+    {% endfor %}
+  </ul>
+</aside>
+{% else %}
+<aside></aside>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if toc %}
+<script>
+(function() {
+  var tocLinks = Array.from(document.querySelectorAll('.toc a'));
+  var headIds = {{ toc | map(attribute='id') | list | tojson }};
+  var heads = headIds.map(function(id) { return document.getElementById(id); }).filter(Boolean);
+  if (!heads.length) return;
+
+  function onScroll() {
+    var top = window.scrollY + 140;
+    var current = heads[0].id;
+    heads.forEach(function(h) { if (h.offsetTop <= top) current = h.id; });
+    tocLinks.forEach(function(a) {
+      a.classList.toggle('active', a.getAttribute('href') === '#' + current);
+    });
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+})();
+</script>
+{% endif %}
+{% endblock %}
