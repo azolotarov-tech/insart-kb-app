@@ -1,15 +1,18 @@
+import base64
 import html as html_lib
+import json
+import os
 import re
-import subprocess
-from pathlib import Path
+import time
+import urllib.request
+
 from flask import Flask, render_template, abort, request, jsonify
 import yaml
 import markdown as md_lib
 
-BASE_DIR = Path(__file__).parent
-REPO_URL = "https://github.com/azolotarov-tech/insart-knowledge-base"
-REPO_DIR = BASE_DIR / "repo"
-DOCS_DIR = REPO_DIR / "docs"
+
+GITHUB_REPO = "azolotarov-tech/insart-knowledge-base"
+GITHUB_DOCS = "docs"
 
 SECTIONS = [
     {
@@ -48,28 +51,52 @@ def inject_globals():
     return {"all_sections": SECTIONS}
 
 
-# ── repo ──────────────────────────────────────────────────────────────────────
+# ── GitHub API ────────────────────────────────────────────────────────────────
 
-def init_repo():
+_cache: dict = {}
+_CACHE_TTL = 300  # seconds
+
+
+def _gh_api(api_path: str):
+    now = time.time()
+    if api_path in _cache and now - _cache[api_path][0] < _CACHE_TTL:
+        return _cache[api_path][1]
+
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{api_path}"
+    req = urllib.request.Request(url)
+    req.add_header("Accept", "application/vnd.github+json")
+    token = os.environ.get("GITHUB_TOKEN", "")
+    if token:
+        req.add_header("Authorization", f"Bearer {token}")
+
     try:
-        if (REPO_DIR / ".git").exists():
-            subprocess.run(["git", "-C", str(REPO_DIR), "pull"], capture_output=True)
-        else:
-            REPO_DIR.mkdir(parents=True, exist_ok=True)
-            result = subprocess.run(
-                ["git", "clone", REPO_URL, str(REPO_DIR)],
-                capture_output=True, text=True,
-            )
-            if result.returncode != 0:
-                app.logger.warning("git clone failed: %s", result.stderr)
-    except FileNotFoundError:
-        app.logger.warning("git not available, skipping repo init (expected on Vercel)")
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+        _cache[api_path] = (now, data)
+        return data
+    except Exception as e:
+        app.logger.warning("GitHub API error for %s: %s", api_path, e)
+        return None
+
+
+def gh_file(docs_rel: str) -> str | None:
+    """Fetch file content as text. docs_rel is relative to docs/."""
+    data = _gh_api(f"{GITHUB_DOCS}/{docs_rel}")
+    if isinstance(data, dict) and data.get("encoding") == "base64":
+        return base64.b64decode(data["content"]).decode("utf-8")
+    return None
+
+
+def gh_list(docs_rel: str) -> list:
+    """List a directory. docs_rel is relative to docs/."""
+    path = f"{GITHUB_DOCS}/{docs_rel}" if docs_rel else GITHUB_DOCS
+    data = _gh_api(path)
+    return data if isinstance(data, list) else []
 
 
 # ── markdown ──────────────────────────────────────────────────────────────────
 
 def _sanitize_yaml(s):
-    # Quote bare @mentions inside YAML flow sequences: [@foo, @bar] → ["@foo", "@bar"]
     def _quote_mentions(match):
         vals = [v.strip() for v in match.group(1).split(",")]
         quoted = ", ".join(f'"@{v.lstrip("@")}"' for v in vals if v)
@@ -88,80 +115,76 @@ def parse_frontmatter(text):
     return {}, text
 
 
-def get_meta(md_path):
-    try:
-        text = Path(md_path).read_text(encoding="utf-8")
-        fm, _ = parse_frontmatter(text)
-        return fm
-    except Exception:
-        return {}
-
-
-def render_page(md_path):
-    text = Path(md_path).read_text(encoding="utf-8")
+def render_page(text: str):
     fm, body = parse_frontmatter(text)
     processor = md_lib.Markdown(extensions=["tables", "toc", "fenced_code"])
     html = processor.convert(body)
-    # Strip leading <h1> so the template's own h1 doesn't duplicate it
     html = re.sub(r"^\s*<h1[^>]*>.*?</h1>\s*", "", html, count=1, flags=re.DOTALL | re.IGNORECASE)
     toc = [
         {"id": m.group(1), "text": html_lib.unescape(re.sub(r"<[^>]+>", "", m.group(2))).strip()}
-        for m in re.finditer(
-            r'<h2[^>]+\bid="([^"]+)"[^>]*>(.*?)</h2>',
-            html,
-            re.IGNORECASE | re.DOTALL,
-        )
+        for m in re.finditer(r'<h2[^>]+\bid="([^"]+)"[^>]*>(.*?)</h2>', html, re.IGNORECASE | re.DOTALL)
     ]
     return fm, html, toc
 
 
-def file_title(fm, path):
-    return fm.get("title") or Path(path).stem.replace("-", " ").title()
+def file_title(fm, filename: str) -> str:
+    if fm.get("title"):
+        return fm["title"]
+    stem = filename.rsplit(".", 1)[0] if "." in filename else filename
+    return stem.replace("-", " ").title()
 
 
 # ── nav ───────────────────────────────────────────────────────────────────────
 
-def _iter_section_files(docs_path: Path, section_key: str):
+def _iter_section_files(section_path: str, section_key: str):
     """Yield (url, title, subfolder_name) for every real doc in a section."""
-    if not docs_path.exists():
-        return
-    subdirs = sorted(d for d in docs_path.iterdir() if d.is_dir())
+    items = gh_list(section_path)
+    subdirs = sorted((i for i in items if i["type"] == "dir"), key=lambda i: i["name"])
+
     if subdirs:
         for sub in subdirs:
-            for f in sorted(sub.glob("*.md")):
-                if f.stem.startswith("_"):
+            sub_items = gh_list(f"{section_path}/{sub['name']}")
+            for f in sorted(
+                (i for i in sub_items if i["type"] == "file" and i["name"].endswith(".md")),
+                key=lambda i: i["name"],
+            ):
+                if f["name"].startswith("_"):
                     continue
-                fm = get_meta(f)
-                yield f"/{section_key}/{sub.name}/{f.stem}", file_title(fm, f), sub.name
+                stem = f["name"][:-3]
+                text = gh_file(f"{section_path}/{sub['name']}/{f['name']}")
+                fm, _ = parse_frontmatter(text or "")
+                yield f"/{section_key}/{sub['name']}/{stem}", file_title(fm, f["name"]), sub["name"]
     else:
-        folder_name = docs_path.name
-        for f in sorted(docs_path.glob("*.md")):
-            if f.stem.startswith("_"):
+        for f in sorted(
+            (i for i in items if i["type"] == "file" and i["name"].endswith(".md")),
+            key=lambda i: i["name"],
+        ):
+            if f["name"].startswith("_"):
                 continue
-            fm = get_meta(f)
-            yield f"/{section_key}/{folder_name}/{f.stem}", file_title(fm, f), folder_name
+            stem = f["name"][:-3]
+            text = gh_file(f"{section_path}/{f['name']}")
+            fm, _ = parse_frontmatter(text or "")
+            yield f"/{section_key}/{section_path}/{stem}", file_title(fm, f["name"]), section_path
 
 
 def build_nav(active_section=None, active_url=None):
     nav = []
     for sec in SECTIONS:
-        key = sec["key"]
-        docs_path = DOCS_DIR / sec["path"]
         groups_map: dict[str, list] = {}
-        for url, title, sub in _iter_section_files(docs_path, key):
+        for url, title, sub in _iter_section_files(sec["path"], sec["key"]):
             groups_map.setdefault(sub, []).append({
                 "url": url,
                 "title": title,
                 "active": url == active_url,
             })
         nav.append({
-            "key": key,
+            "key": sec["key"],
             "label": sec["label"],
             "groups": [
                 {"name": k.replace("-", " ").title(), "pages": v}
                 for k, v in groups_map.items()
             ],
-            "collapsed": key != active_section,
+            "collapsed": sec["key"] != active_section,
         })
     return nav
 
@@ -172,12 +195,17 @@ def build_nav(active_section=None, active_url=None):
 def home():
     sections_data = []
     for sec in SECTIONS:
-        docs_path = DOCS_DIR / sec["path"]
-        count = (
-            sum(1 for f in docs_path.rglob("*.md") if not f.stem.startswith("_"))
-            if docs_path.exists()
-            else 0
-        )
+        items = gh_list(sec["path"])
+        count = 0
+        for i in items:
+            if i["type"] == "dir":
+                sub_items = gh_list(f"{sec['path']}/{i['name']}")
+                count += sum(
+                    1 for f in sub_items
+                    if f["type"] == "file" and f["name"].endswith(".md") and not f["name"].startswith("_")
+                )
+            elif i["type"] == "file" and i["name"].endswith(".md") and not i["name"].startswith("_"):
+                count += 1
         sections_data.append({**sec, "count": count})
     return render_template(
         "home.html",
@@ -193,9 +221,8 @@ def section_index(section):
     if section not in SECTION_BY_KEY:
         abort(404)
     sec = SECTION_BY_KEY[section]
-    docs_path = DOCS_DIR / sec["path"]
     groups_map: dict[str, list] = {}
-    for url, title, sub in _iter_section_files(docs_path, section):
+    for url, title, sub in _iter_section_files(sec["path"], section):
         groups_map.setdefault(sub, []).append({"url": url, "title": title})
     groups = [
         {"name": k.replace("-", " ").title(), "pages": v}
@@ -217,18 +244,16 @@ def doc_page(section, subsection, slug):
     if section not in SECTION_BY_KEY:
         abort(404)
     sec = SECTION_BY_KEY[section]
-    docs_root = DOCS_DIR / sec["path"]
 
-    md_path = docs_root / subsection / f"{slug}.md"
-    if not md_path.exists():
-        # flat layout: subsection is actually ignored, file is at root
-        md_path = docs_root / f"{slug}.md"
-        if not md_path.exists():
+    text = gh_file(f"{sec['path']}/{subsection}/{slug}.md")
+    if text is None:
+        text = gh_file(f"{sec['path']}/{slug}.md")
+        if text is None:
             abort(404)
 
+    fm, html_body, toc = render_page(text)
+    pg_title = file_title(fm, f"{slug}.md")
     active_url = f"/{section}/{subsection}/{slug}"
-    fm, html_body, toc = render_page(md_path)
-    pg_title = file_title(fm, md_path)
 
     return render_template(
         "page.html",
@@ -257,42 +282,41 @@ def search_api():
     results = []
 
     for sec in SECTIONS:
-        docs_path = DOCS_DIR / sec["path"]
-        if not docs_path.exists():
-            continue
-        for md_file in sorted(docs_path.rglob("*.md")):
-            if md_file.stem.startswith("_"):
-                continue
+        items = gh_list(sec["path"])
+        files_to_search = []
+
+        for i in items:
+            if i["type"] == "dir":
+                sub_items = gh_list(f"{sec['path']}/{i['name']}")
+                for f in sub_items:
+                    if f["type"] == "file" and f["name"].endswith(".md") and not f["name"].startswith("_"):
+                        files_to_search.append((f"{sec['path']}/{i['name']}/{f['name']}", i["name"]))
+            elif i["type"] == "file" and i["name"].endswith(".md") and not i["name"].startswith("_"):
+                files_to_search.append((f"{sec['path']}/{i['name']}", sec["path"]))
+
+        for docs_rel, sub_name in sorted(files_to_search):
             try:
-                fm, html, _ = render_page(md_file)
+                text = gh_file(docs_rel)
+                if not text:
+                    continue
+                fm, html, _ = render_page(text)
                 plain = re.sub(r"<[^>]+>", "", html)
-                t = file_title(fm, md_file)
+                filename = docs_rel.rsplit("/", 1)[-1]
+                stem = filename[:-3]
+                t = file_title(fm, filename)
                 if ql not in t.lower() and ql not in plain.lower():
                     continue
 
-                rel = md_file.relative_to(docs_path)
-                parts = rel.parts
-                if len(parts) == 1:
-                    url = f'/{sec["key"]}/{docs_path.name}/{md_file.stem}'
-                    crumb = sec["label"]
-                else:
-                    url = f'/{sec["key"]}/{parts[0]}/{md_file.stem}'
-                    crumb = f'{sec["label"]} › {parts[0].replace("-", " ").title()}'
-
+                url = f'/{sec["key"]}/{sub_name}/{stem}'
+                crumb = (
+                    f'{sec["label"]} › {sub_name.replace("-", " ").title()}'
+                    if sub_name != sec["path"] else sec["label"]
+                )
                 hi = re.sub(f"(?i)({re.escape(q)})", r"<mark>\1</mark>", t)
                 idx = plain.lower().find(ql)
-                excerpt = (
-                    plain[max(0, idx - 60): idx + 120].strip()
-                    if idx >= 0
-                    else plain[:180]
-                )
+                excerpt = plain[max(0, idx - 60): idx + 120].strip() if idx >= 0 else plain[:180]
 
-                results.append({
-                    "title": hi,
-                    "crumb": crumb,
-                    "url": url,
-                    "excerpt": excerpt,
-                })
+                results.append({"title": hi, "crumb": crumb, "url": url, "excerpt": excerpt})
                 if len(results) >= 8:
                     return jsonify(results)
             except Exception:
@@ -300,9 +324,6 @@ def search_api():
 
     return jsonify(results)
 
-
-# Run init on import so it works with both `flask run` and `python app.py`
-init_repo()
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080, debug=True)
