@@ -144,12 +144,14 @@ def _iter_section_files(section_path: str, section_key: str):
     if subdirs:
         for sub in subdirs:
             sub_items = gh_list(f"{section_path}/{sub['name']}")
-            for f in sorted(
-                (i for i in sub_items if i["type"] == "file" and i["name"].endswith(".md")),
+            md_files = sorted(
+                (i for i in sub_items if i["type"] == "file" and i["name"].endswith(".md") and not i["name"].startswith("_")),
                 key=lambda i: i["name"],
-            ):
-                if f["name"].startswith("_"):
-                    continue
+            )
+            if not md_files:
+                yield None, None, sub["name"]
+                continue
+            for f in md_files:
                 stem = f["name"][:-3]
                 text = gh_file(f"{section_path}/{sub['name']}/{f['name']}")
                 fm, _ = parse_frontmatter(text or "")
@@ -172,11 +174,14 @@ def build_nav(active_section=None, active_url=None):
     for sec in SECTIONS:
         groups_map: dict[str, list] = {}
         for url, title, sub in _iter_section_files(sec["path"], sec["key"]):
-            groups_map.setdefault(sub, []).append({
-                "url": url,
-                "title": title,
-                "active": url == active_url,
-            })
+            if url is None:
+                groups_map.setdefault(sub, [])
+            else:
+                groups_map.setdefault(sub, []).append({
+                    "url": url,
+                    "title": title,
+                    "active": url == active_url,
+                })
         nav.append({
             "key": sec["key"],
             "label": sec["label"],
@@ -223,7 +228,10 @@ def section_index(section):
     sec = SECTION_BY_KEY[section]
     groups_map: dict[str, list] = {}
     for url, title, sub in _iter_section_files(sec["path"], section):
-        groups_map.setdefault(sub, []).append({"url": url, "title": title})
+        if url is None:
+            groups_map.setdefault(sub, [])
+        else:
+            groups_map.setdefault(sub, []).append({"url": url, "title": title})
     groups = [
         {"name": k.replace("-", " ").title(), "pages": v}
         for k, v in groups_map.items()

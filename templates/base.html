@@ -243,6 +243,10 @@ body.dark .tab.active { border-bottom-color: var(--accent); color: var(--accent)
   letter-spacing: .5px; color: var(--text-faint);
   padding: 10px 12px 4px; margin-top: 4px;
 }
+.nav-empty {
+  font-size: 12.5px; color: var(--text-faint); font-style: italic;
+  padding: 4px 12px; margin: 0;
+}
 
 /* ---- article ---- */
 .content { padding: 30px 44px 90px; min-width: 0; max-width: 820px; }
@@ -626,11 +630,15 @@ pre code {
           {% if section.groups | length > 1 %}
           <div class="nav-sub-title">{{ group.name }}</div>
           {% endif %}
+          {% if group.pages %}
           <ul class="nav-list">
             {% for item in group.pages %}
             <li><a href="{{ item.url }}" {% if item.active %}class="active"{% endif %}>{{ item.title }}</a></li>
             {% endfor %}
           </ul>
+          {% else %}
+          <p class="nav-empty">No documents yet</p>
+          {% endif %}
         {% endfor %}
       {% else %}
         <ul class="nav-list">
