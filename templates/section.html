@@ -9,25 +9,40 @@
   </div>
 
   <h1>{{ sec.label }}</h1>
-  <p style="color: var(--text-muted); font-size:16px; margin: 0 0 8px;">{{ sec.description }}</p>
+  <p style="color: var(--text-muted); font-size:16px; margin: 0 0 16px;">{{ sec.description }}</p>
 
   {% if groups %}
     {% for group in groups %}
-    <div class="sub-group">
-      <h2>{{ group.name }}</h2>
-      {% if group.pages %}
-      <ul class="doc-list">
-        {% for item in group.pages %}
-        <li><a href="{{ item.url }}">{{ item.title }}</a></li>
-        {% endfor %}
-      </ul>
-      {% else %}
-      <p style="color: var(--text-faint); font-style: italic; font-size: 14px; margin: 0;">No documents yet</p>
-      {% endif %}
+    <div class="sub-group collapsed">
+      <h2>
+        {{ group.name }}
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
+          <path d="m6 9 6 6 6-6"></path>
+        </svg>
+      </h2>
+      <div class="sub-group-body">
+        {% if group.pages %}
+        <ul class="doc-list">
+          {% for item in group.pages %}
+          <li><a href="{{ item.url }}">{{ item.title }}</a></li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p style="color: var(--text-faint); font-style: italic; font-size: 14px; margin: 0;">No documents yet</p>
+        {% endif %}
+      </div>
     </div>
     {% endfor %}
   {% else %}
     <p style="color: var(--text-faint); margin-top: 40px;">No articles yet — check back soon.</p>
   {% endif %}
 </main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('.section-index .sub-group h2').forEach(function(h) {
+  h.addEventListener('click', function() { h.closest('.sub-group').classList.toggle('collapsed'); });
+});
+</script>
 {% endblock %}
