@@ -146,6 +146,46 @@ body.dark .brand-divider { background: var(--border-strong); }
 }
 .search.open .search-kbd { display: none; }
 
+/* AI search button inside the header search input */
+.search.open .search-input { padding-right: 56px; }
+.ai-search-btn {
+  position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+  font-family: "IBM Plex Mono", monospace; font-size: 10.5px; font-weight: 700;
+  letter-spacing: .3px; text-transform: uppercase;
+  padding: 3px 8px; border-radius: 5px;
+  background: var(--accent-tint); color: var(--accent);
+  border: 1px solid var(--accent);
+  cursor: pointer; display: none; white-space: nowrap;
+  transition: background .12s ease, color .12s ease;
+}
+.search.open .ai-search-btn { display: block; }
+.ai-search-btn:hover { background: var(--accent); color: #fff; }
+.ai-search-btn.busy { background: var(--accent); color: #fff; opacity: .7; pointer-events: none; }
+
+/* AI answer block inside the search dropdown */
+.sr-ai-answer {
+  padding: 13px 16px 11px;
+  background: var(--accent-tint);
+  border-bottom: 1px solid var(--border);
+}
+.sr-ai-label {
+  font-family: "IBM Plex Mono", monospace; font-size: 10.5px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .6px;
+  color: var(--accent); margin-bottom: 6px;
+  display: flex; align-items: center; gap: 7px;
+}
+.sr-ai-text { font-size: 13.5px; line-height: 1.6; color: var(--text); }
+.sr-ai-loading {
+  display: flex; align-items: center; gap: 9px;
+  padding: 16px; font-size: 13px; color: var(--text-muted);
+}
+@keyframes srSpin { to { transform: rotate(360deg); } }
+.sr-spin {
+  width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0;
+  border: 2px solid var(--border); border-top-color: var(--accent);
+  animation: srSpin .65s linear infinite;
+}
+
 .search-results {
   display: none;
   position: absolute; top: 46px; left: 0; right: 0;
@@ -167,6 +207,18 @@ body.dark .brand-divider { background: var(--border-strong); }
 .sr-item .t mark { background: var(--coral-tint); color: var(--coral); padding: 0 2px; border-radius: 3px; }
 .sr-item .c { font-size: 12.5px; color: var(--text-muted); line-height: 1.45; }
 .sr-item .crumb { font-size: 11px; color: var(--text-faint); font-family: "IBM Plex Mono", monospace; }
+
+/* confidence badge */
+.conf-badge {
+  font-family: "IBM Plex Mono", monospace; font-size: 10.5px; font-weight: 700;
+  padding: 2px 7px; border-radius: 4px; white-space: nowrap; flex-shrink: 0;
+}
+.conf-high { background: #e6f9ed; color: #1a7c3e; }
+.conf-med  { background: #fff8e6; color: #a66c00; }
+.conf-low  { background: var(--coral-tint); color: var(--coral); }
+body.dark .conf-high { background: #0d2e1a; color: #5ed88d; }
+body.dark .conf-med  { background: #2a2000; color: #e6b84a; }
+body.dark .conf-low  { background: var(--coral-tint); color: var(--coral); }
 
 .top-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; }
 .icon-btn {
@@ -600,6 +652,7 @@ pre code {
     </svg>
     <input class="search-input" id="searchInput" placeholder="Search the knowledge base" autocomplete="off">
     <span class="search-kbd">⌘K</span>
+    <button type="button" class="ai-search-btn" id="aiSearchBtn">AI</button>
     <div class="search-results" id="searchResults"></div>
   </div>
 
@@ -622,6 +675,8 @@ pre code {
   {% for sec in all_sections %}
   <a class="tab {% if active_tab == sec.key %}active{% endif %}" href="/{{ sec.key }}">{{ sec.label }}</a>
   {% endfor %}
+  <a class="tab {% if active_tab == 'ask' %}active{% endif %}" href="/ask">Ask AI</a>
+  <a class="tab {% if active_tab == 'upload' %}active{% endif %}" href="/upload">Upload</a>
 </nav>
 
 {% block before_layout %}{% endblock %}
@@ -699,6 +754,7 @@ pre code {
   var searchEl  = document.getElementById('search');
   var input     = document.getElementById('searchInput');
   var resultsEl = document.getElementById('searchResults');
+  var aiBtn     = document.getElementById('aiSearchBtn');
   var searchTO;
 
   function escHtml(s) {
@@ -716,6 +772,7 @@ pre code {
     if (e.key === 'Escape') { searchEl.classList.remove('open'); input.blur(); }
   });
 
+  // ---- keyword search (on keystroke) ----
   input.addEventListener('input', function () {
     clearTimeout(searchTO);
     var q = input.value.trim();
@@ -741,6 +798,57 @@ pre code {
         })
         .catch(function(){ resultsEl.innerHTML = ''; });
     }, 250);
+  });
+
+  // ---- AI search (on button click) ----
+  aiBtn.addEventListener('click', function () {
+    var q = input.value.trim();
+    if (q.length < 5) return;
+    clearTimeout(searchTO);
+    aiBtn.classList.add('busy');
+    aiBtn.textContent = '…';
+    searchEl.classList.add('open');
+    resultsEl.innerHTML = '<div class="sr-ai-loading"><div class="sr-spin"></div>Searching with AI…</div>';
+
+    fetch('/api/ask?q=' + encodeURIComponent(q))
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        aiBtn.classList.remove('busy');
+        aiBtn.textContent = 'AI';
+        function confBadge(pct) {
+          var cls = pct >= 75 ? 'conf-high' : (pct >= 50 ? 'conf-med' : 'conf-low');
+          return '<span class="conf-badge ' + cls + '">' + pct + '%</span>';
+        }
+        var html = '';
+        if (data.answer) {
+          var topConf = (data.sources && data.sources.length) ? (data.sources[0].confidence || 0) : 0;
+          html += '<div class="sr-ai-answer">' +
+            '<div class="sr-ai-label">AI Answer' + (topConf ? ' ' + confBadge(topConf) : '') + '</div>' +
+            '<div class="sr-ai-text">' + escHtml(data.answer) + '</div>' +
+            '</div>';
+        }
+        if (data.sources && data.sources.length) {
+          html += '<div class="sr-head">' + data.sources.length + ' source' + (data.sources.length !== 1 ? 's' : '') + '</div>';
+          data.sources.forEach(function(s) {
+            var pct = s.confidence || 0;
+            html += '<a class="sr-item" href="' + escHtml(s.url) + '">' +
+              '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">' +
+              '<div class="crumb">' + escHtml(s.crumb) + '</div>' +
+              confBadge(pct) +
+              '</div>' +
+              '<div class="t">' + escHtml(s.title) + '</div>' +
+              '<div class="c">' + escHtml(s.excerpt) + '</div>' +
+              '</a>';
+          });
+        }
+        if (!html) html = '<div class="sr-head">' + escHtml(data.error || 'No results found.') + '</div>';
+        resultsEl.innerHTML = html;
+      })
+      .catch(function() {
+        aiBtn.classList.remove('busy');
+        aiBtn.textContent = 'AI';
+        resultsEl.innerHTML = '<div class="sr-head">AI search failed. Try again.</div>';
+      });
   });
 
   // ---- collapsible nav groups ----

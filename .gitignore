@@ -5,3 +5,6 @@ __pycache__/
 INSART-Knowledge-Base-standalone.html
 /home.html
 /repo/
+
+.env
+/test-cases

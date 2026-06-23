@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+
+{% block layout %}
+<style>
+@keyframes kb-spin {
+  to { transform: rotate(360deg); }
+}
+.kb-spinner {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 48px 0 32px;
+}
+.kb-spinner.visible { display: flex; }
+.kb-spinner-ring {
+  width: 40px; height: 40px; border-radius: 50%;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  animation: kb-spin .75s linear infinite;
+}
+.kb-spinner-label {
+  font-size: 14px; color: var(--text-muted);
+  font-family: "IBM Plex Mono", monospace;
+}
+.kb-clear-btn {
+  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+  width: 22px; height: 22px; border-radius: 50%; border: none;
+  background: var(--border); color: var(--text-muted);
+  display: none; align-items: center; justify-content: center;
+  cursor: pointer; padding: 0; transition: background .12s ease;
+}
+.kb-clear-btn:hover { background: var(--border-strong); color: var(--text); }
+.kb-clear-btn.visible { display: flex; }
+</style>
+
+<div style="max-width: 760px; margin: 0 auto; padding: 40px 32px 80px">
+  <h1 style="font-size: 30px; font-weight: 700; letter-spacing: -0.6px; margin: 0 0 8px; color: var(--text);">
+    Ask the Knowledge Base
+  </h1>
+  <p style="font-size: 16px; color: var(--text-muted); margin: 0 0 28px">
+    Ask any question in plain language — AI will find the most relevant documents and summarise the answer.
+  </p>
+
+  <form id="askForm" method="GET" action="/ask" style="display: flex; gap: 10px; margin-bottom: 36px">
+    <div style="position: relative; flex: 1;">
+      <input
+        id="askInput"
+        type="text"
+        name="q"
+        value="{{ q | e }}"
+        placeholder="e.g. Do we have a case where we quickly landed a fintech client?"
+        autofocus
+        autocomplete="off"
+        style="
+          width: 100%; height: 48px;
+          border: 1px solid var(--border); border-radius: 10px;
+          background: var(--surface); color: var(--text);
+          padding: 0 44px 0 16px;
+          font: inherit; font-size: 15px; outline: none;
+          transition: border-color 0.15s ease;
+        "
+        onfocus="this.style.borderColor='var(--accent)'"
+        onblur="this.style.borderColor='var(--border)'"
+      />
+      <button type="button" id="clearBtn" class="kb-clear-btn" title="Clear">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:12px;height:12px">
+          <path d="M18 6 6 18M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+    <button type="submit" class="btn btn-primary" style="height: 48px; padding: 0 22px; flex-shrink: 0">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:17px;height:17px">
+        <circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path>
+      </svg>
+      Ask
+    </button>
+  </form>
+
+  <!-- spinner shown on submit, hidden once results are rendered -->
+  <div id="spinner" class="kb-spinner">
+    <div class="kb-spinner-ring"></div>
+    <span class="kb-spinner-label">Searching knowledge base…</span>
+  </div>
+
+  {% if error %}
+  <div style="background: var(--coral-tint); color: var(--coral); border: 1px solid var(--coral);
+              border-radius: 10px; padding: 14px 18px; margin-bottom: 28px; font-size: 14px;">
+    {{ error }}
+  </div>
+  {% endif %}
+
+  {% if answer %}
+  <div style="background: var(--accent-tint); border: 1px solid var(--border);
+              border-left: 4px solid var(--accent); border-radius: 10px;
+              padding: 22px 26px; margin-bottom: 32px;">
+    <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; font-weight: 700;
+                text-transform: uppercase; letter-spacing: 0.7px; color: var(--accent); margin-bottom: 12px;
+                display: flex; align-items: center; gap: 8px;">
+      AI Answer
+      {% if sources %}
+      {% set top = sources[0].confidence %}
+      <span class="conf-badge {% if top >= 75 %}conf-high{% elif top >= 50 %}conf-med{% else %}conf-low{% endif %}">{{ top }}%</span>
+      {% endif %}
+    </div>
+    <p style="margin: 0; font-size: 15.5px; line-height: 1.7; color: var(--text);">{{ answer }}</p>
+  </div>
+  {% endif %}
+
+  {% if sources %}
+  <div>
+    <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; font-weight: 700;
+                text-transform: uppercase; letter-spacing: 0.7px; color: var(--text-faint); margin-bottom: 14px;">
+      {{ sources | length }} source{% if sources | length != 1 %}s{% endif %}
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 10px">
+      {% for s in sources %}
+      <a href="{{ s.url }}"
+         style="display: block; border: 1px solid var(--border); border-radius: 10px;
+                padding: 16px 20px; background: var(--surface); text-decoration: none;
+                transition: border-color 0.12s ease, box-shadow 0.12s ease;"
+         onmouseover="this.style.borderColor='var(--accent)';this.style.boxShadow='var(--shadow)'"
+         onmouseout="this.style.borderColor='var(--border)';this.style.boxShadow='none'">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+          <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--text-faint);">
+            {{ s.crumb }}
+          </div>
+          <span class="conf-badge {% if s.confidence >= 75 %}conf-high{% elif s.confidence >= 50 %}conf-med{% else %}conf-low{% endif %}">{{ s.confidence }}%</span>
+        </div>
+        <div style="font-weight: 600; color: var(--text); font-size: 15px; margin-bottom: 6px;">
+          {{ s.title }}
+        </div>
+        <div style="font-size: 13.5px; color: var(--text-muted); line-height: 1.55">
+          {{ s.excerpt }}
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if not q %}
+  <div style="margin-top: 48px; border-top: 1px solid var(--border); padding-top: 32px;">
+    <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; font-weight: 700;
+                text-transform: uppercase; letter-spacing: 0.7px; color: var(--text-faint); margin-bottom: 16px;">
+      Example questions
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      {% for example in [
+        "Do we have any projects in the insurance field?",
+        "What solutions we used for our banking projects?",
+        "Which experts do we have in the payments domain?",
+      ] %}
+      <a href="/ask?q={{ example | urlencode }}"
+         style="display: block; padding: 11px 16px; border: 1px solid var(--border); border-radius: 8px;
+                background: var(--surface); color: var(--text-muted); font-size: 14px;
+                text-decoration: none; transition: border-color 0.12s ease;"
+         onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--text)'"
+         onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'">
+        {{ example }}
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+(function () {
+  var input   = document.getElementById('askInput');
+  var clearBtn = document.getElementById('clearBtn');
+  var form    = document.getElementById('askForm');
+  var spinner = document.getElementById('spinner');
+
+  function syncClear() {
+    clearBtn.classList.toggle('visible', input.value.length > 0);
+  }
+
+  // show X when input has value
+  input.addEventListener('input', syncClear);
+  syncClear(); // run on page load (handles pre-filled value from URL)
+
+  // X button: clear input and go back to /ask
+  clearBtn.addEventListener('click', function () {
+    window.location.href = '/ask';
+  });
+
+  // show spinner on submit
+  form.addEventListener('submit', function () {
+    spinner.classList.add('visible');
+  });
+})();
+</script>
+{% endblock %}
