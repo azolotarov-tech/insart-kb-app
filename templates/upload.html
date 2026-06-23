@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block layout %}
+<div style="max-width: 600px; margin: 0 auto; padding: 40px 32px 80px;">
+
+  <h1 style="font-size: 30px; font-weight: 700; letter-spacing: -.6px; margin: 0 0 8px; color: var(--text);">Upload Document</h1>
+  <p style="font-size: 16px; color: var(--text-muted); margin: 0 0 28px;">
+    Upload a Markdown file to the Knowledge Base. It will be saved to GitHub and indexed for AI search immediately.
+  </p>
+
+  {% if error %}
+  <div style="background: var(--coral-tint); color: var(--coral); border: 1px solid var(--coral);
+              border-radius: 10px; padding: 14px 18px; margin-bottom: 24px; font-size: 14px;">
+    {{ error }}
+  </div>
+  {% endif %}
+
+  {% if success %}
+  <div style="background: #e6f9ed; color: #1a7c3e; border: 1px solid #8fd4a7;
+              border-radius: 10px; padding: 14px 18px; margin-bottom: 24px; font-size: 14px;">
+    {{ success }}
+  </div>
+  {% endif %}
+
+  <form method="POST" enctype="multipart/form-data"
+        style="display: flex; flex-direction: column; gap: 22px;">
+
+    <!-- Section -->
+    <div>
+      <label style="display: block; font-weight: 600; font-size: 14px; margin-bottom: 7px; color: var(--text);">
+        Section
+      </label>
+      <select name="section" required
+              style="width: 100%; height: 42px; border: 1px solid var(--border); border-radius: 8px;
+                     background: var(--surface); color: var(--text); padding: 0 12px;
+                     font: inherit; font-size: 14px; outline: none;">
+        {% for sec in sections %}
+        <option value="{{ sec.key }}" {% if request.form.get('section') == sec.key %}selected{% endif %}>
+          {{ sec.label }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <!-- Subfolder -->
+    <div>
+      <label style="display: block; font-weight: 600; font-size: 14px; margin-bottom: 7px; color: var(--text);">
+        Subfolder
+      </label>
+      <select name="subfolder" required
+              style="width: 100%; height: 42px; border: 1px solid var(--border); border-radius: 8px;
+                     background: var(--surface); color: var(--text); padding: 0 12px;
+                     font: inherit; font-size: 14px; outline: none;">
+        {% for sf in subfolders %}
+        <option value="{{ sf }}" {% if request.form.get('subfolder') == sf %}selected{% endif %}>
+          {{ sf | replace('-', ' ') | title }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <!-- File -->
+    <div>
+      <label style="display: block; font-weight: 600; font-size: 14px; margin-bottom: 7px; color: var(--text);">
+        Markdown file
+      </label>
+      <input
+        type="file"
+        name="file"
+        accept=".md"
+        required
+        style="font: inherit; font-size: 14px; color: var(--text); cursor: pointer;"
+      >
+      <p style="font-size: 13px; color: var(--text-faint); margin: 6px 0 0;">
+        Only <code>.md</code> files are accepted.
+      </p>
+    </div>
+
+    <!-- Password -->
+    <div>
+      <label style="display: block; font-weight: 600; font-size: 14px; margin-bottom: 7px; color: var(--text);">
+        Upload password
+      </label>
+      <input
+        type="password"
+        name="password"
+        required
+        placeholder="Enter upload password"
+        style="width: 100%; height: 42px; border: 1px solid var(--border); border-radius: 8px;
+               background: var(--surface); color: var(--text); padding: 0 12px;
+               font: inherit; font-size: 14px; outline: none;"
+        onfocus="this.style.borderColor='var(--accent)'"
+        onblur="this.style.borderColor='var(--border)'"
+      >
+    </div>
+
+    <div>
+      <button type="submit" class="btn btn-primary">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        Upload Document
+      </button>
+    </div>
+
+  </form>
+</div>
+{% endblock %}

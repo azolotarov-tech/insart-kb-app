@@ -1,4 +1,5 @@
 import base64
+import hashlib
 import html as html_lib
 import json
 import os
@@ -10,8 +11,14 @@ from flask import Flask, render_template, abort, request, jsonify
 import yaml
 import markdown as md_lib
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv(".env.local")
+except ImportError:
+    pass
 
-GITHUB_REPO = "azolotarov-tech/insart-knowledge-base"
+
+GITHUB_REPO = "vzherebetskyiInsart/insart-knowledge-base"
 GITHUB_DOCS = "docs"
 
 SECTIONS = [
@@ -43,7 +50,53 @@ SECTIONS = [
 
 SECTION_BY_KEY = {s["key"]: s for s in SECTIONS}
 
+UPLOAD_SUBFOLDERS = [
+    "accounting", "banking", "blockchain", "insurance",
+    "lending", "payments", "regtech", "wealth-management",
+]
+
+QDRANT_COLLECTION = "insart_kb"
+EMBED_MODEL = "voyage-finance-2"
+
 app = Flask(__name__)
+
+# ── vector search clients (lazy init) ─────────────────────────────────────────
+
+_qdrant_client = None
+_voyage_client = None
+_sparse_model = None
+
+
+def _get_qdrant():
+    global _qdrant_client
+    if _qdrant_client is None:
+        url = os.environ.get("QDRANT_URL")
+        key = os.environ.get("QDRANT_API_KEY")
+        if url and key:
+            from qdrant_client import QdrantClient
+            _qdrant_client = QdrantClient(url=url, api_key=key)
+    return _qdrant_client
+
+
+def _get_voyage():
+    global _voyage_client
+    if _voyage_client is None:
+        key = os.environ.get("VOYAGE_API_KEY")
+        if key:
+            import voyageai
+            _voyage_client = voyageai.Client(api_key=key)
+    return _voyage_client
+
+
+def _get_sparse_model():
+    global _sparse_model
+    if _sparse_model is None:
+        try:
+            from fastembed import SparseTextEmbedding
+            _sparse_model = SparseTextEmbedding(model_name="Qdrant/bm25")
+        except Exception as e:
+            app.logger.warning("BM25 sparse model unavailable: %s", e)
+    return _sparse_model
 
 
 @app.context_processor
@@ -94,6 +147,50 @@ def gh_list(docs_rel: str) -> list:
     return data if isinstance(data, list) else []
 
 
+def gh_write(repo_path: str, content: str, commit_msg: str = None):
+    """Create or update a file in the GitHub repo. Returns (ok, error_str)."""
+    token = os.environ.get("GITHUB_TOKEN", "")
+    if not token:
+        return False, "GITHUB_TOKEN not set"
+
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{repo_path}"
+
+    # fetch existing SHA if file already exists
+    sha = None
+    try:
+        chk = urllib.request.Request(url)
+        chk.add_header("Accept", "application/vnd.github+json")
+        chk.add_header("Authorization", f"Bearer {token}")
+        with urllib.request.urlopen(chk, timeout=10) as r:
+            sha = json.loads(r.read()).get("sha")
+    except Exception:
+        pass
+
+    payload = {
+        "message": commit_msg or f"Upload {repo_path.rsplit('/', 1)[-1]} via KB web UI",
+        "content": base64.b64encode(content.encode()).decode(),
+    }
+    if sha:
+        payload["sha"] = sha
+
+    req = urllib.request.Request(url, data=json.dumps(payload).encode(), method="PUT")
+    req.add_header("Accept", "application/vnd.github+json")
+    req.add_header("Authorization", f"Bearer {token}")
+    req.add_header("Content-Type", "application/json")
+    try:
+        with urllib.request.urlopen(req, timeout=15):
+            return True, ""
+    except urllib.error.HTTPError as e:
+        try:
+            body = json.loads(e.read().decode())
+            detail = body.get("message", e.reason)
+        except Exception:
+            detail = e.reason
+        return False, f"HTTP {e.code}: {detail}"
+    except Exception as e:
+        return False, str(e)
+
+
 # ── markdown ──────────────────────────────────────────────────────────────────
 
 def _sanitize_yaml(s):
@@ -132,6 +229,80 @@ def file_title(fm, filename: str) -> str:
         return fm["title"]
     stem = filename.rsplit(".", 1)[0] if "." in filename else filename
     return stem.replace("-", " ").title()
+
+
+def _plain_text(content: str) -> str:
+    _, body = parse_frontmatter(content)
+    processor = md_lib.Markdown(extensions=["tables", "fenced_code"])
+    return re.sub(r"<[^>]+>", "", processor.convert(body)).strip()
+
+
+def _path_to_id(path: str) -> int:
+    return int(hashlib.md5(path.encode()).hexdigest()[:15], 16)
+
+
+def _chunk_text(text, chunk_size=1000, overlap=150):
+    """Split text into overlapping chunks on paragraph boundaries."""
+    paragraphs = [p.strip() for p in re.split(r"\n\n+", text) if p.strip()]
+    chunks = []
+    current = []
+    current_len = 0
+    for para in paragraphs:
+        if current_len + len(para) > chunk_size and current:
+            chunks.append(" ".join(current))
+            overlap_paras = []
+            overlap_len = 0
+            for p in reversed(current):
+                if overlap_len + len(p) <= overlap:
+                    overlap_paras.insert(0, p)
+                    overlap_len += len(p)
+                else:
+                    break
+            current = overlap_paras
+            current_len = overlap_len
+        current.append(para)
+        current_len += len(para)
+    if current:
+        chunks.append(" ".join(current))
+    return chunks if chunks else [text[:chunk_size]]
+
+
+def _index_doc(qc, vc, repo_path: str, content: str, sec: dict, subfolder: str, filename: str):
+    """Embed a document as chunks (dense + sparse) and upsert each into Qdrant."""
+    from qdrant_client.models import PointStruct, SparseVector
+    fm, _ = parse_frontmatter(content)
+    title = file_title(fm, filename)
+    stem = filename[:-3]
+    url = f"/{sec['key']}/{subfolder}/{stem}"
+    text = _plain_text(content)
+    if not text:
+        return
+    chunks = _chunk_text(text)
+    dense_result = vc.embed(chunks, model=EMBED_MODEL, input_type="document")
+    sm = _get_sparse_model()
+    sparse_embs = list(sm.embed(chunks)) if sm else [None] * len(chunks)
+    points = []
+    for i, (chunk, dense_vec, sparse_emb) in enumerate(zip(chunks, dense_result.embeddings, sparse_embs)):
+        vector = {"dense": dense_vec}
+        if sparse_emb is not None:
+            vector["sparse"] = SparseVector(
+                indices=sparse_emb.indices.tolist(),
+                values=sparse_emb.values.tolist(),
+            )
+        points.append(PointStruct(
+            id=_path_to_id(f"{repo_path}::chunk::{i}"),
+            vector=vector,
+            payload={
+                "path": repo_path,
+                "section_key": sec["key"],
+                "section_label": sec["label"],
+                "subfolder": subfolder,
+                "title": title,
+                "url": url,
+                "text": chunk,
+            },
+        ))
+    qc.upsert(collection_name=QDRANT_COLLECTION, points=points)
 
 
 # ── nav ───────────────────────────────────────────────────────────────────────
@@ -331,6 +502,206 @@ def search_api():
                 continue
 
     return jsonify(results)
+
+
+def _score_to_pct(score: float, is_hybrid: bool) -> int:
+    """Normalize a Qdrant score to a 0-99 integer percentage."""
+    if is_hybrid:
+        # RRF scores: max ≈ 2/61 ≈ 0.033 (rank-1 in both dense + sparse)
+        return min(round(score / 0.033 * 100), 99)
+    # Dense cosine similarity: already 0-1
+    return min(round(score * 100), 99)
+
+
+def _do_ask(q: str):
+    """Hybrid search (BM25 + vector) + Claude synthesis. Returns (answer, sources, error)."""
+    from qdrant_client.models import Prefetch, FusionQuery, Fusion, SparseVector
+
+    qc = _get_qdrant()
+    vc = _get_voyage()
+    if not qc or not vc:
+        return None, [], "AI search is not configured on this server."
+
+    try:
+        dense_vec = vc.embed([q], model=EMBED_MODEL, input_type="query").embeddings[0]
+
+        sm = _get_sparse_model()
+        is_hybrid = bool(sm)
+        if is_hybrid:
+            sparse_q = list(sm.embed([q]))[0]
+            response = qc.query_points(
+                collection_name=QDRANT_COLLECTION,
+                prefetch=[
+                    Prefetch(query=dense_vec, using="dense", limit=20),
+                    Prefetch(
+                        query=SparseVector(
+                            indices=sparse_q.indices.tolist(),
+                            values=sparse_q.values.tolist(),
+                        ),
+                        using="sparse",
+                        limit=20,
+                    ),
+                ],
+                query=FusionQuery(fusion=Fusion.RRF),
+                limit=5,
+            )
+        else:
+            response = qc.query_points(
+                collection_name=QDRANT_COLLECTION, query=dense_vec, using="dense", limit=5
+            )
+
+        if not response or not response.points:
+            return None, [], "No relevant documents found for your question."
+
+        # build sources, deduplicating chunks from the same document
+        seen_urls = set()
+        sources = []
+        for point in response.points:
+            p = point.payload
+            url = p["url"]
+            if url in seen_urls:
+                continue
+            seen_urls.add(url)
+            sub = p.get("subfolder", "")
+            crumb = (
+                f"{p['section_label']} › {sub.replace('-', ' ').title()}"
+                if sub and sub != p.get("section_key") else p["section_label"]
+            )
+            sources.append({
+                "title": p["title"],
+                "url": url,
+                "crumb": crumb,
+                "excerpt": p.get("text", "")[:220],
+                "full_text": p.get("text", ""),
+                # "confidence": _score_to_pct(point.score, is_hybrid),
+                "confidence": round(point.score, 2) * 100,
+            })
+
+        answer = None
+        anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
+        if anthropic_key:
+            try:
+                import anthropic as _ac
+                context = "\n\n---\n\n".join(
+                    f"[{s['title']}] ({s['crumb']})\n{s['full_text']}" for s in sources
+                )
+                msg = _ac.Anthropic(api_key=anthropic_key).messages.create(
+                    model="claude-haiku-4-5-20251001",
+                    max_tokens=512,
+                    messages=[{"role": "user", "content": (
+                        "You are a helpful assistant for the INSART Knowledge Base. "
+                        "Answer the question based only on the provided documents. "
+                        "Be concise (2-4 sentences). If the answer isn't in the documents, say so.\n\n"
+                        f"Documents:\n{context}\n\nQuestion: {q}"
+                    )}],
+                )
+                answer = msg.content[0].text
+            except Exception as e:
+                app.logger.warning("Claude synthesis failed: %s", e)
+
+        return answer, sources, None
+
+    except Exception as e:
+        app.logger.error("Ask error: %s", e)
+        return None, [], "Search failed. Please try again."
+
+
+@app.route("/api/ask")
+def ask_api():
+    q = request.args.get("q", "").strip()
+    if len(q) < 5:
+        return jsonify({"error": "Query too short."})
+    answer, sources, error = _do_ask(q)
+    if error and not sources:
+        return jsonify({"error": error})
+    return jsonify({
+        "answer": answer,
+        "sources": [
+            {
+                "title": s["title"],
+                "url": s["url"],
+                "crumb": s["crumb"],
+                "excerpt": s["excerpt"],
+                "confidence": s.get("confidence", 0),
+            }
+            for s in sources
+        ],
+    })
+
+
+@app.route("/ask")
+def ask_page():
+    q = request.args.get("q", "").strip()
+    answer, sources, error = (None, [], None)
+    if len(q) >= 5:
+        answer, sources, error = _do_ask(q)
+    return render_template(
+        "ask.html",
+        q=q,
+        answer=answer,
+        sources=sources,
+        error=error,
+        nav=[],
+        active_tab="ask",
+        title="Ask AI — INSART KB",
+    )
+
+
+@app.route("/upload", methods=["GET", "POST"])
+def upload_page():
+    ctx = dict(sections=SECTIONS, subfolders=UPLOAD_SUBFOLDERS, nav=[], active_tab="upload", title="Upload Document — INSART KB")
+
+    if request.method == "GET":
+        return render_template("upload.html", **ctx)
+
+    # ── POST ──────────────────────────────────────────────────────────────────
+    password = request.form.get("password", "")
+    upload_pw = os.environ.get("UPLOAD_PASSWORD", "")
+    if not upload_pw or password != upload_pw:
+        return render_template("upload.html", error="Invalid password.", **ctx)
+
+    section_key = request.form.get("section", "")
+    if section_key not in SECTION_BY_KEY:
+        return render_template("upload.html", error="Invalid section.", **ctx)
+    sec = SECTION_BY_KEY[section_key]
+
+    subfolder = request.form.get("subfolder", "")
+    if subfolder not in UPLOAD_SUBFOLDERS:
+        return render_template("upload.html", error="Invalid subfolder selection.", **ctx)
+
+    file = request.files.get("file")
+    if not file or not file.filename.endswith(".md"):
+        return render_template("upload.html", error="Please upload a .md file.", **ctx)
+
+    try:
+        content = file.read().decode("utf-8")
+    except Exception:
+        return render_template("upload.html", error="Could not read file. Ensure it is valid UTF-8.", **ctx)
+
+    filename = os.path.basename(file.filename)
+    repo_path = f"{GITHUB_DOCS}/{sec['path']}/{subfolder}/{filename}"
+
+    ok, err = gh_write(repo_path, content)
+    if not ok:
+        return render_template("upload.html", error=f"GitHub write failed: {err}", **ctx)
+    _cache.clear()
+
+    qc = _get_qdrant()
+    vc = _get_voyage()
+    if not qc or not vc:
+        return render_template("upload.html", error="Vector search is not configured on this server.", **ctx)
+
+    try:
+        _index_doc(qc, vc, repo_path, content, sec, subfolder, filename)
+    except Exception as e:
+        app.logger.error("Indexing failed for %s: %s", repo_path, e)
+        return render_template("upload.html", error=f"GitHub upload succeeded but indexing failed: {e}", **ctx)
+
+    return render_template(
+        "upload.html",
+        success=f'"{filename}" uploaded to docs/{sec["path"]}/{subfolder}/ and indexed for AI search.',
+        **ctx,
+    )
 
 
 if __name__ == "__main__":

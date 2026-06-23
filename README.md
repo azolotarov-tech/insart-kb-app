@@ -8,7 +8,7 @@ A documentation portal that fetches and renders content live from a GitHub repos
 - **Templating**: Jinja2
 - **Markdown rendering**: `markdown` + `pymdownx` extensions
 - **Frontend**: Vanilla JS + custom CSS (no framework)
-- **Content source**: GitHub API (`azolotarov-tech/insart-knowledge-base`)
+- **Content source**: GitHub API (`vzherebetskyiInsart/insart-knowledge-base`)
 - **Deployment**: Vercel
 
 ## Project Structure
@@ -44,8 +44,8 @@ The app starts at [http://localhost:8080](http://localhost:8080) with hot-reload
 
 ## Environment Variables
 
-| Variable | Required | Description |
-|---|---|---|
+| Variable       | Required | Description                                                                                                                                           |
+| -------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `GITHUB_TOKEN` | Optional | GitHub personal access token. Raises the API rate limit from 60 to 5,000 requests/hour. Recommended for local development and required in production. |
 
 Set it in your shell or a `.env` file before starting the app:
@@ -58,3 +58,16 @@ export GITHUB_TOKEN=your_personal_access_token
 
 - Content is fetched from GitHub on each request and cached for 5 minutes (300 s TTL).
 - A git submodule at `./repo` points to the content repository but is not needed — the app uses the API, not local files.
+
+# AI Search
+
+## Indexing
+
+All logic necessary for documents fetching and indexing into the vector db is located in the index.py file. You need to run it only once in order to fetch all docs from the github repo and put them into the database. This is also useful in case of migrations i.e. if you decide to migrate everything to a different database.
+
+## TODO:
+
+-- confidence levels
+-- change format of the answer
+-- list of subfolders and add concurrent uploading to github and voyage
+-- show note that something is draft if draft
