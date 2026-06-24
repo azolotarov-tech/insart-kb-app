@@ -50,10 +50,11 @@ SECTIONS = [
 
 SECTION_BY_KEY = {s["key"]: s for s in SECTIONS}
 
-UPLOAD_SUBFOLDERS = [
-    "accounting", "banking", "blockchain", "insurance",
-    "lending", "payments", "regtech", "wealth-management",
-]
+UPLOAD_SUBFOLDERS = {
+    "sales-enablement": ["accounting", "banking", "blockchain", "insurance", "lending", "payments", "regtech", "wealth-management"],
+    "engineering-handbook": ['ai-ml', 'architecture', 'backend', 'cloud', 'compliance', 'data-pipelines', 'frontend', 'integrations', 'security'],
+    "domains": ["accounting", "banking", "blockchain", "insurance", "lending", "payments", "regtech", "wealth-management"],
+}
 
 QDRANT_COLLECTION = "insart_kb"
 EMBED_MODEL = "voyage-finance-2"
@@ -665,9 +666,13 @@ def upload_page():
         return render_template("upload.html", error="Invalid section.", **ctx)
     sec = SECTION_BY_KEY[section_key]
 
-    subfolder = request.form.get("subfolder", "")
-    if subfolder not in UPLOAD_SUBFOLDERS:
-        return render_template("upload.html", error="Invalid subfolder selection.", **ctx)
+    withSubfolder = bool(UPLOAD_SUBFOLDERS.get(section_key))
+    subfolder = None
+
+    if withSubfolder:
+        subfolder = request.form.get("subfolder", "")
+        if subfolder not in UPLOAD_SUBFOLDERS[section_key]:
+            return render_template("upload.html", error="Invalid subfolder selection.", **ctx)
 
     file = request.files.get("file")
     if not file or not file.filename.endswith(".md"):
@@ -679,7 +684,7 @@ def upload_page():
         return render_template("upload.html", error="Could not read file. Ensure it is valid UTF-8.", **ctx)
 
     filename = os.path.basename(file.filename)
-    repo_path = f"{GITHUB_DOCS}/{sec['path']}/{subfolder}/{filename}"
+    repo_path = f"{GITHUB_DOCS}/{sec['path']}/{subfolder}/{filename}" if withSubfolder else f"{GITHUB_DOCS}/{sec['path']}/{filename}"
 
     ok, err = gh_write(repo_path, content)
     if not ok:
@@ -699,9 +704,22 @@ def upload_page():
 
     return render_template(
         "upload.html",
-        success=f'"{filename}" uploaded to docs/{sec["path"]}/{subfolder}/ and indexed for AI search.',
+        success=f'"{filename}" uploaded to {repo_path} and indexed for AI search.',
         **ctx,
     )
+
+
+# ── Slack bot ─────────────────────────────────────────────────────────────────
+
+# try:
+#     from slack_bot import handler as _slack_handler
+
+#     @app.route("/slack/events", methods=["POST"])
+#     def slack_events():
+#         return _slack_handler.handle(request)
+
+# except ImportError:
+#     pass  # slack-bolt not installed — Slack routes disabled
 
 
 if __name__ == "__main__":

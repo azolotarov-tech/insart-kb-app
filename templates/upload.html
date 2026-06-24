@@ -30,10 +30,11 @@
       <label style="display: block; font-weight: 600; font-size: 14px; margin-bottom: 7px; color: var(--text);">
         Section
       </label>
-      <select name="section" required
+      <select id="section" name="section" required
               style="width: 100%; height: 42px; border: 1px solid var(--border); border-radius: 8px;
                      background: var(--surface); color: var(--text); padding: 0 12px;
                      font: inherit; font-size: 14px; outline: none;">
+        <option value="" disabled selected hidden>Choose the Section</option>
         {% for sec in sections %}
         <option value="{{ sec.key }}" {% if request.form.get('section') == sec.key %}selected{% endif %}>
           {{ sec.label }}
@@ -43,19 +44,20 @@
     </div>
 
     <!-- Subfolder -->
-    <div>
+    <div id="subfolder-container">
       <label style="display: block; font-weight: 600; font-size: 14px; margin-bottom: 7px; color: var(--text);">
         Subfolder
       </label>
-      <select name="subfolder" required
+      <select id="subfolder" name="subfolder" required disabled
               style="width: 100%; height: 42px; border: 1px solid var(--border); border-radius: 8px;
                      background: var(--surface); color: var(--text); padding: 0 12px;
                      font: inherit; font-size: 14px; outline: none;">
-        {% for sf in subfolders %}
+        <option value="" disabled selected hidden>Choose the Subfolder</option>
+        <!-- {% for sf in subfolders%}
         <option value="{{ sf }}" {% if request.form.get('subfolder') == sf %}selected{% endif %}>
           {{ sf | replace('-', ' ') | title }}
         </option>
-        {% endfor %}
+        {% endfor %} -->
       </select>
     </div>
 
@@ -107,4 +109,49 @@
 
   </form>
 </div>
+
+<script>
+  // 1. Define your dependent options data object
+  const optionsData = {
+    "sales-enablement": [{"accounting": "Accounting"}, {"banking": "Banking"}, {"blockchain": "Blockchain"}, {"insurance": "Insurance"}, {"lending": "Lending"}, {"payments": "Payments"}, {"regtech": "Regtech"}, {"wealth-management": "Wealth-Management"}],
+    "engineering-handbook": [
+      {'ai-ml': 'AI ML'}, {'architecture': 'Architecture'}, {'backend': 'Backend'}, {'cloud': 'Cloud'}, {'compliance': 'Compliance'}, {'data-pipelines': 'Data Pipelines'}, {'frontend': 'Frontend'}, {'integrations': 'Integrations'}, {'security': 'Security'}
+    ]
+  };
+
+  // 2. Get DOM references to both dropdowns
+  const categoryDropdown = document.getElementById("section");
+  const itemDropdown = document.getElementById("subfolder");
+
+  const subfolderContainer = document.getElementById("subfolder-container");
+
+  // 3. Listen for changes on the first dropdown
+  categoryDropdown.addEventListener("change", function() {
+      const selectedCategory = this.value;
+
+      // Clear previous options except the first default placeholder
+      itemDropdown.innerHTML = '<option value="">Choose the Subfolder</option>';
+
+      if (selectedCategory && !optionsData[selectedCategory]) {
+        subfolderContainer.style.display = 'none';
+      }
+
+      if (selectedCategory && optionsData[selectedCategory]) {
+          subfolderContainer.style.display = 'block';
+          // Enable the second dropdown
+          itemDropdown.disabled = false;
+
+          // Loop through the array matching the chosen key and append new options
+          optionsData[selectedCategory].forEach(function(subItem) {
+              const optionElement = document.createElement("option");
+              optionElement.value = Object.keys(subItem);
+              optionElement.textContent = Object.values(subItem);
+              itemDropdown.appendChild(optionElement);
+          });
+      } else {
+          // If the placeholder is selected, disable the second dropdown
+          itemDropdown.disabled = true;
+      }
+  });
+</script>
 {% endblock %}
