@@ -1,27 +1,63 @@
-{% extends "base.html" %}
-
-{% block before_layout %}
+{% extends "base.html" %} {% block before_layout %}
 <!-- ============ HERO ============ -->
 <section class="hero">
   <div class="hero-inner">
     <span class="eyebrow"><span class="dot"></span> INSART Knowledge Base</span>
-    <h1>We Help Fintech Companies <span class="accent">Build, Launch, and Grow</span></h1>
-    <p class="sub">One source of truth for engineering and growth — architecture playbooks, fintech domain knowledge, and everything you need to scope, build, and win the next engagement.</p>
+    <h1>
+      We Help Fintech Companies
+      <span class="accent">Build, Launch, and Grow</span>
+    </h1>
+    <p class="sub">
+      One source of truth for engineering and growth — architecture playbooks,
+      fintech domain knowledge, and everything you need to scope, build, and win
+      the next engagement.
+    </p>
 
     <div class="hero-search">
-      <svg class="si" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-      <input id="heroSearch" placeholder="Search playbooks, domains, standards…" autocomplete="off" />
-      <span class="hs-kbd">⌘K</span>
+      <svg
+        class="si"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+      >
+        <circle cx="11" cy="11" r="7" />
+        <path d="m21 21-4.3-4.3" />
+      </svg>
+      <input
+        id="heroSearch"
+        placeholder="Search handbooks, domains, standards…"
+        autocomplete="off"
+      />
+      <span class="hs-kbd" id="heroKbd">⌘K</span>
+      <button type="button" class="hero-ai-btn" id="heroAiBtn">AI</button>
       <div id="heroResults"></div>
     </div>
 
     <div class="hero-ctas">
       <a class="btn btn-primary" href="/engineering-handbook">
         Get started
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.2"
+        >
+          <path d="M5 12h14M13 6l6 6-6 6" />
+        </svg>
       </a>
       <a class="btn btn-ghost" href="/engineering-handbook">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+          <path
+            d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"
+          />
+        </svg>
         Browse the handbook
       </a>
     </div>
@@ -40,48 +76,129 @@
   <div class="home-section-head">
     <div class="kicker">Start here</div>
     <h2>Jump straight in</h2>
-    <p>Whether you're shipping code or scoping a deal, these are the fastest routes into the knowledge base.</p>
+    <p>
+      Whether you're shipping code or scoping a deal, these are the fastest
+      routes into the knowledge base.
+    </p>
   </div>
   <div class="qs-grid">
     <a class="qs-card" href="/engineering-handbook">
       <div class="qs-ico">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg>
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path d="M16 18l6-6-6-6M8 6l-6 6 6 6" />
+        </svg>
       </div>
       <div class="qs-body">
         <h3>New engineer? Start here</h3>
-        <p>Local setup, architecture principles, and our coding standards across backend, frontend, and cloud.</p>
+        <p>
+          Local setup, architecture principles, and our coding standards across
+          backend, frontend, and cloud.
+        </p>
       </div>
-      <span class="qs-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17 17 7M9 7h8v8"/></svg></span>
+      <span class="qs-arrow"
+        ><svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path d="M7 17 17 7M9 7h8v8" /></svg
+      ></span>
     </a>
     <a class="qs-card" href="/sales-enablement">
       <div class="qs-ico">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h6"/></svg>
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path
+            d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+          />
+          <path d="M14 2v6h6M9 13h6M9 17h6" />
+        </svg>
       </div>
       <div class="qs-body">
         <h3>Building a proposal</h3>
-        <p>The proposal playbook, estimation guidelines, and reusable SOW templates for a winning response.</p>
+        <p>
+          The proposal playbook, estimation guidelines, and reusable SOW
+          templates for a winning response.
+        </p>
       </div>
-      <span class="qs-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17 17 7M9 7h8v8"/></svg></span>
+      <span class="qs-arrow"
+        ><svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path d="M7 17 17 7M9 7h8v8" /></svg
+      ></span>
     </a>
     <a class="qs-card" href="/fintech-domains">
       <div class="qs-ico">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <rect x="3" y="3" width="7" height="7" rx="1.5" />
+          <rect x="14" y="3" width="7" height="7" rx="1.5" />
+          <rect x="3" y="14" width="7" height="7" rx="1.5" />
+          <rect x="14" y="14" width="7" height="7" rx="1.5" />
+        </svg>
       </div>
       <div class="qs-body">
         <h3>Explore fintech domains</h3>
-        <p>Banking, payments, lending, insurance, wealth, RegTech and more — domain context for every build.</p>
+        <p>
+          Banking, payments, lending, insurance, wealth, RegTech and more —
+          domain context for every build.
+        </p>
       </div>
-      <span class="qs-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17 17 7M9 7h8v8"/></svg></span>
+      <span class="qs-arrow"
+        ><svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path d="M7 17 17 7M9 7h8v8" /></svg
+      ></span>
     </a>
     <a class="qs-card" href="/engineering-handbook">
       <div class="qs-ico">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path d="M12 2 2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+        </svg>
       </div>
       <div class="qs-body">
         <h3>Architecture &amp; best practices</h3>
-        <p>Reference architectures, security and compliance baselines, and data-pipeline patterns.</p>
+        <p>
+          Reference architectures, security and compliance baselines, and
+          data-pipeline patterns.
+        </p>
       </div>
-      <span class="qs-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17 17 7M9 7h8v8"/></svg></span>
+      <span class="qs-arrow"
+        ><svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path d="M7 17 17 7M9 7h8v8" /></svg
+      ></span>
     </a>
   </div>
 </section>
@@ -94,26 +211,65 @@
       <h2>Popular this month</h2>
     </div>
     <div class="pop-grid">
-      <a class="pop-item" href="/sales-enablement"><span class="pi-num">01</span><span class="pi-main"><div class="pi-title">Writing a Winning Fintech Proposal</div><div class="pi-crumb">Sales Enablement / Overview</div></span><span class="pi-tag c">playbook</span></a>
-      <a class="pop-item" href="/engineering-handbook"><span class="pi-num">02</span><span class="pi-main"><div class="pi-title">Reference architecture diagrams</div><div class="pi-crumb">Engineering / Architecture</div></span><span class="pi-tag">guide</span></a>
-      <a class="pop-item" href="/sales-enablement"><span class="pi-num">03</span><span class="pi-main"><div class="pi-title">Estimation &amp; scoping guidelines</div><div class="pi-crumb">Sales Enablement / Overview</div></span><span class="pi-tag c">playbook</span></a>
-      <a class="pop-item" href="/fintech-domains"><span class="pi-num">04</span><span class="pi-main"><div class="pi-title">Payments domain primer</div><div class="pi-crumb">Fintech Domains / Payments</div></span><span class="pi-tag">domain</span></a>
-      <a class="pop-item" href="/engineering-handbook"><span class="pi-num">05</span><span class="pi-main"><div class="pi-title">Security &amp; compliance baseline</div><div class="pi-crumb">Engineering / Security</div></span><span class="pi-tag">guide</span></a>
-      <a class="pop-item" href="/sales-enablement"><span class="pi-num">06</span><span class="pi-main"><div class="pi-title">Wealth management use cases</div><div class="pi-crumb">Sales Enablement / Wealth Management</div></span><span class="pi-tag c">use case</span></a>
+      <a class="pop-item" href="/sales-enablement"
+        ><span class="pi-num">01</span
+        ><span class="pi-main"
+          ><div class="pi-title">Writing a Winning Fintech Proposal</div>
+          <div class="pi-crumb">Sales Enablement / Overview</div></span
+        ><span class="pi-tag c">playbook</span></a
+      >
+      <a class="pop-item" href="/engineering-handbook"
+        ><span class="pi-num">02</span
+        ><span class="pi-main"
+          ><div class="pi-title">Reference architecture diagrams</div>
+          <div class="pi-crumb">Engineering / Architecture</div></span
+        ><span class="pi-tag">guide</span></a
+      >
+      <a class="pop-item" href="/sales-enablement"
+        ><span class="pi-num">03</span
+        ><span class="pi-main"
+          ><div class="pi-title">Estimation &amp; scoping guidelines</div>
+          <div class="pi-crumb">Sales Enablement / Overview</div></span
+        ><span class="pi-tag c">playbook</span></a
+      >
+      <a class="pop-item" href="/fintech-domains"
+        ><span class="pi-num">04</span
+        ><span class="pi-main"
+          ><div class="pi-title">Payments domain primer</div>
+          <div class="pi-crumb">Fintech Domains / Payments</div></span
+        ><span class="pi-tag">domain</span></a
+      >
+      <a class="pop-item" href="/engineering-handbook"
+        ><span class="pi-num">05</span
+        ><span class="pi-main"
+          ><div class="pi-title">Security &amp; compliance baseline</div>
+          <div class="pi-crumb">Engineering / Security</div></span
+        ><span class="pi-tag">guide</span></a
+      >
+      <a class="pop-item" href="/sales-enablement"
+        ><span class="pi-num">06</span
+        ><span class="pi-main"
+          ><div class="pi-title">Wealth management use cases</div>
+          <div class="pi-crumb">Sales Enablement / Wealth Management</div></span
+        ><span class="pi-tag c">use case</span></a
+      >
     </div>
   </section>
 </div>
-{% endblock %}
-
-{% block layout %}{% endblock %}
-
-{% block after_layout %}
+{% endblock %} {% block layout %}{% endblock %} {% block after_layout %}
 <!-- ============ FOOTER ============ -->
 <footer class="site-footer">
   <div class="footer-inner">
     <div class="footer-brand">
-      <img class="footer-logo" src="{{ url_for('static', filename='logo.png') }}" alt="INSART" />
-      <p>The fintech engineering &amp; growth knowledge base — one source of truth for how we build, launch, and grow.</p>
+      <img
+        class="footer-logo"
+        src="{{ url_for('static', filename='logo.png') }}"
+        alt="INSART"
+      />
+      <p>
+        The fintech engineering &amp; growth knowledge base — one source of
+        truth for how we build, launch, and grow.
+      </p>
     </div>
     <div>
       <h4>Handbook</h4>
@@ -148,43 +304,118 @@
     <span>Built for engineering + growth</span>
   </div>
 </footer>
-{% endblock %}
-
-{% block scripts %}
+{% endblock %} {% block scripts %}
 <script>
 (function () {
-  var heroSearch = document.getElementById('heroSearch');
-  var drop = document.getElementById('heroResults');
-  drop.style.cssText = 'display:none;position:absolute;top:66px;left:0;right:0;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 32px rgba(28,18,74,.18);overflow:hidden;max-height:420px;overflow-y:auto;z-index:200';
+  var heroSearch = document.getElementById("heroSearch");
+  var drop      = document.getElementById("heroResults");
+  var aiBtn     = document.getElementById("heroAiBtn");
+  var kbdHint   = document.getElementById("heroKbd");
+  var searchTO;
 
-  function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  drop.style.cssText =
+    "display:none;position:absolute;top:66px;left:0;right:0;" +
+    "background:var(--surface);color:var(--text);text-align:left;" +
+    "border:1px solid var(--border);border-radius:10px;" +
+    "box-shadow:0 8px 32px rgba(28,18,74,.18);" +
+    "overflow:hidden;max-height:420px;overflow-y:auto;z-index:200";
 
-  var t;
-  heroSearch.addEventListener('input', function () {
-    clearTimeout(t);
+  function esc(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function confBadge(pct) {
+    var cls = pct >= 75 ? 'conf-high' : (pct >= 50 ? 'conf-med' : 'conf-low');
+    return '<span class="conf-badge ' + cls + '">' + pct + '%</span>';
+  }
+
+  // Show AI button when input has enough text, hide ⌘K hint
+  function syncAiBtn() {
+    var hasText = heroSearch.value.trim().length >= 2;
+    aiBtn.style.display = hasText ? 'block' : 'none';
+    kbdHint.style.display = hasText ? 'none' : '';
+    heroSearch.style.paddingRight = hasText ? '62px' : '50px';
+  }
+
+  // ---- keyword search (on keystroke) ----
+  heroSearch.addEventListener("input", function () {
+    syncAiBtn();
+    clearTimeout(searchTO);
     var q = heroSearch.value.trim();
-    if (q.length < 2) { drop.style.display = 'none'; return; }
-    t = setTimeout(function () {
-      fetch('/search?q=' + encodeURIComponent(q))
+    if (q.length < 2) { drop.style.display = "none"; return; }
+    searchTO = setTimeout(function () {
+      fetch("/search?q=" + encodeURIComponent(q))
         .then(function (r) { return r.json(); })
         .then(function (data) {
           if (!data.length) {
             drop.innerHTML = '<div class="sr-head">No results for "' + esc(q) + '"</div>';
           } else {
-            var h = '<div class="sr-head">' + data.length + ' result' + (data.length > 1 ? 's' : '') + '</div>';
+            var h = '<div class="sr-head">' + data.length + ' result' + (data.length > 1 ? 's' : '') + ' for "' + esc(q) + '"</div>';
             data.forEach(function (r) {
-              h += '<a class="sr-item" href="' + esc(r.url) + '"><div class="crumb">' + esc(r.crumb) + '</div><div class="t">' + r.title + '</div><div class="c">' + esc(r.excerpt) + '</div></a>';
+              h += '<a class="sr-item" href="' + esc(r.url) + '">' +
+                '<div class="crumb">' + esc(r.crumb) + '</div>' +
+                '<div class="t">' + r.title + '</div>' +
+                '<div class="c">' + esc(r.excerpt) + '</div>' +
+                '</a>';
             });
             drop.innerHTML = h;
           }
-          drop.style.display = 'block';
+          drop.style.display = "block";
         })
-        .catch(function () { drop.style.display = 'none'; });
+        .catch(function () { drop.style.display = "none"; });
     }, 250);
   });
 
-  document.addEventListener('click', function (e) {
-    if (!heroSearch.parentElement.contains(e.target)) drop.style.display = 'none';
+  // ---- AI search (on button click) ----
+  aiBtn.addEventListener("click", function () {
+    var q = heroSearch.value.trim();
+    if (q.length < 5) return;
+    clearTimeout(searchTO);
+    aiBtn.classList.add("busy");
+    aiBtn.textContent = "…";
+    drop.innerHTML = '<div class="sr-ai-loading"><div class="sr-spin"></div>Searching with AI…</div>';
+    drop.style.display = "block";
+
+    fetch("/api/ask?q=" + encodeURIComponent(q))
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        aiBtn.classList.remove("busy");
+        aiBtn.textContent = "AI";
+        var html = '';
+        if (data.answer) {
+          var topConf = (data.sources && data.sources.length) ? (data.sources[0].confidence || 0) : 0;
+          html += '<div class="sr-ai-answer">' +
+            '<div class="sr-ai-label">AI Answer' + (topConf ? ' ' + confBadge(topConf) : '') + '</div>' +
+            '<div class="sr-ai-text">' + esc(data.answer) + '</div>' +
+            '</div>';
+        }
+        if (data.sources && data.sources.length) {
+          html += '<div class="sr-head">' + data.sources.length + ' source' + (data.sources.length !== 1 ? 's' : '') + '</div>';
+          data.sources.forEach(function (s) {
+            var pct = s.confidence || 0;
+            html += '<a class="sr-item" href="' + esc(s.url) + '">' +
+              '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">' +
+              '<div class="crumb">' + esc(s.crumb) + '</div>' +
+              confBadge(pct) +
+              '</div>' +
+              '<div class="t">' + esc(s.title) + '</div>' +
+              '<div class="c">' + esc(s.excerpt) + '</div>' +
+              '</a>';
+          });
+        }
+        if (!html) html = '<div class="sr-head">' + esc(data.error || 'No results found.') + '</div>';
+        drop.innerHTML = html;
+      })
+      .catch(function () {
+        aiBtn.classList.remove("busy");
+        aiBtn.textContent = "AI";
+        drop.innerHTML = '<div class="sr-head">AI search failed. Try again.</div>';
+      });
+  });
+
+  document.addEventListener("click", function (e) {
+    if (!heroSearch.parentElement.contains(e.target))
+      drop.style.display = "none";
   });
 })();
 </script>
