@@ -13,7 +13,7 @@ import markdown as md_lib
 
 try:
     from dotenv import load_dotenv
-    load_dotenv(".env.local")
+    load_dotenv(".env")
 except ImportError:
     pass
 
@@ -711,15 +711,15 @@ def upload_page():
 
 # ── Slack bot ─────────────────────────────────────────────────────────────────
 
-# try:
-#     from slack_bot import handler as _slack_handler
+try:
+    from slack_bot import handler as _slack_handler
 
-#     @app.route("/slack/events", methods=["POST"])
-#     def slack_events():
-#         return _slack_handler.handle(request)
+    @app.route("/slack/events", methods=["POST"])
+    def slack_events():
+        return _slack_handler.handle(request)
 
-# except ImportError:
-#     pass  # slack-bolt not installed — Slack routes disabled
+except ImportError:
+    pass  # slack-bolt not installed — Slack routes disabled
 
 
 if __name__ == "__main__":
