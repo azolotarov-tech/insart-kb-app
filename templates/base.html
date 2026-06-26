@@ -1206,6 +1206,22 @@
         align-items: center;
         justify-content: center;
       }
+      .btn-ai {
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+        height: 35px;
+        padding: 0 12px;
+        border-radius: 11px;
+        font-size: 15.5px;
+        font-weight: 600;
+        cursor: pointer;
+        border: 1px solid transparent;
+        transition: transform 0.12s ease, background 0.15s ease,
+          box-shadow 0.15s ease;
+        align-self: center;
+        margin-left: auto;
+      }
       .btn {
         display: inline-flex;
         align-items: center;
@@ -1220,7 +1236,8 @@
         transition: transform 0.12s ease, background 0.15s ease,
           box-shadow 0.15s ease;
       }
-      .btn:hover {
+      .btn:hover,
+      .btn-ai:hover {
         text-decoration: none;
         transform: translateY(-1px);
       }
@@ -1568,6 +1585,7 @@
       </div>
     </header>
 
+    {% block tabs %}
     <!-- section tabs -->
     <nav class="tabs">
       <a class="tab {% if active_tab == 'home' %}active{% endif %}" href="/"
@@ -1580,15 +1598,9 @@
         >{{ sec.label }}</a
       >
       {% endfor %}
-      <a class="tab {% if active_tab == 'ask' %}active{% endif %}" href="/ask"
-        >Ask AI</a
-      >
-      <a
-        class="tab {% if active_tab == 'upload' %}active{% endif %}"
-        href="/upload"
-        >Upload</a
-      >
+      <a class="btn-ai btn-primary" href="/ask">Ask AI</a>
     </nav>
+    {% endblock %}
 
     {% block before_layout %}{% endblock %} {% block layout %}
     <!-- ============ BODY ============ -->

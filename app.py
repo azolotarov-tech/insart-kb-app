@@ -7,7 +7,7 @@ import re
 import time
 import urllib.request
 
-from flask import Flask, render_template, abort, request, jsonify
+from flask import Flask, render_template, abort, request, jsonify, session, redirect, url_for
 import yaml
 import markdown as md_lib
 
@@ -60,6 +60,7 @@ QDRANT_COLLECTION = "insart_kb"
 EMBED_MODEL = "voyage-finance-2"
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", "insart-kb-dev-secret")
 
 # ── vector search clients (lazy init) ─────────────────────────────────────────
 
@@ -648,22 +649,70 @@ def ask_page():
     )
 
 
-@app.route("/upload", methods=["GET", "POST"])
+@app.route("/upload")
 def upload_page():
-    ctx = dict(sections=SECTIONS, subfolders=UPLOAD_SUBFOLDERS, nav=[], active_tab="upload", title="Upload Document — INSART KB")
+    return redirect(url_for("admin_login"))
+
+
+# ── Admin ──────────────────────────────────────────────────────────────────────
+
+def _admin_required():
+    if not session.get("admin_logged_in"):
+        return redirect(url_for("admin_login"))
+    return None
+
+
+@app.route("/admin", methods=["GET", "POST"])
+def admin_login():
+    if session.get("admin_logged_in"):
+        return redirect(url_for("admin_user"))
+
+    error = None
+    if request.method == "POST":
+        username = request.form.get("username", "")
+        password = request.form.get("password", "")
+        upload_pw = os.environ.get("UPLOAD_PASSWORD", "")
+        if username == "admin" and upload_pw and password == upload_pw:
+            session["admin_logged_in"] = True
+            return redirect(url_for("admin_user"))
+        error = "Invalid username or password."
+
+    return render_template("admin_login.html", error=error, title="Admin Login — INSART KB")
+
+
+@app.route("/admin/logout")
+def admin_logout():
+    session.pop("admin_logged_in", None)
+    return redirect(url_for("admin_login"))
+
+
+@app.route("/admin/user")
+def admin_user():
+    redir = _admin_required()
+    if redir:
+        return redir
+    return render_template("admin_user.html", title="Admin — INSART KB", active_admin_tab="user")
+
+
+@app.route("/admin/upload", methods=["GET", "POST"])
+def admin_upload():
+    redir = _admin_required()
+    if redir:
+        return redir
+
+    ctx = dict(
+        sections=SECTIONS,
+        subfolders=UPLOAD_SUBFOLDERS,
+        active_admin_tab="upload",
+        title="Upload Document — INSART KB",
+    )
 
     if request.method == "GET":
-        return render_template("upload.html", **ctx)
-
-    # ── POST ──────────────────────────────────────────────────────────────────
-    password = request.form.get("password", "")
-    upload_pw = os.environ.get("UPLOAD_PASSWORD", "")
-    if not upload_pw or password != upload_pw:
-        return render_template("upload.html", error="Invalid password.", **ctx)
+        return render_template("admin_upload.html", **ctx)
 
     section_key = request.form.get("section", "")
     if section_key not in SECTION_BY_KEY:
-        return render_template("upload.html", error="Invalid section.", **ctx)
+        return render_template("admin_upload.html", error="Invalid section.", **ctx)
     sec = SECTION_BY_KEY[section_key]
 
     withSubfolder = bool(UPLOAD_SUBFOLDERS.get(section_key))
@@ -672,38 +721,38 @@ def upload_page():
     if withSubfolder:
         subfolder = request.form.get("subfolder", "")
         if subfolder not in UPLOAD_SUBFOLDERS[section_key]:
-            return render_template("upload.html", error="Invalid subfolder selection.", **ctx)
+            return render_template("admin_upload.html", error="Invalid subfolder selection.", **ctx)
 
     file = request.files.get("file")
     if not file or not file.filename.endswith(".md"):
-        return render_template("upload.html", error="Please upload a .md file.", **ctx)
+        return render_template("admin_upload.html", error="Please upload a .md file.", **ctx)
 
     try:
         content = file.read().decode("utf-8")
     except Exception:
-        return render_template("upload.html", error="Could not read file. Ensure it is valid UTF-8.", **ctx)
+        return render_template("admin_upload.html", error="Could not read file. Ensure it is valid UTF-8.", **ctx)
 
     filename = os.path.basename(file.filename)
     repo_path = f"{GITHUB_DOCS}/{sec['path']}/{subfolder}/{filename}" if withSubfolder else f"{GITHUB_DOCS}/{sec['path']}/{filename}"
 
     ok, err = gh_write(repo_path, content)
     if not ok:
-        return render_template("upload.html", error=f"GitHub write failed: {err}", **ctx)
+        return render_template("admin_upload.html", error=f"GitHub write failed: {err}", **ctx)
     _cache.clear()
 
     qc = _get_qdrant()
     vc = _get_voyage()
     if not qc or not vc:
-        return render_template("upload.html", error="Vector search is not configured on this server.", **ctx)
+        return render_template("admin_upload.html", error="Vector search is not configured on this server.", **ctx)
 
     try:
         _index_doc(qc, vc, repo_path, content, sec, subfolder, filename)
     except Exception as e:
         app.logger.error("Indexing failed for %s: %s", repo_path, e)
-        return render_template("upload.html", error=f"GitHub upload succeeded but indexing failed: {e}", **ctx)
+        return render_template("admin_upload.html", error=f"GitHub upload succeeded but indexing failed: {e}", **ctx)
 
     return render_template(
-        "upload.html",
+        "admin_upload.html",
         success=f'"{filename}" uploaded to {repo_path} and indexed for AI search.',
         **ctx,
     )
