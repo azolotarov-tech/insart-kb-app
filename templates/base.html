@@ -1600,9 +1600,7 @@
       {% endfor %}
       <a class="btn-ai btn-primary" href="/ask">Ask AI</a>
     </nav>
-    {% endblock %}
-
-    {% block before_layout %}{% endblock %} {% block layout %}
+    {% endblock %} {% block before_layout %}{% endblock %} {% block layout %}
     <!-- ============ BODY ============ -->
     <div class="layout">
       <!-- LEFT NAV -->
@@ -1710,7 +1708,7 @@
         var searchTO;
 
         function syncAiBtn() {
-          var hasText = input.value.trim().length >= 2;
+          var hasText = input.value.trim().length >= 5;
           aiBtn.style.display = hasText ? "block" : "none";
           if (kbdEl) kbdEl.style.display = hasText ? "none" : "";
         }

@@ -306,117 +306,175 @@
 </footer>
 {% endblock %} {% block scripts %}
 <script>
-(function () {
-  var heroSearch = document.getElementById("heroSearch");
-  var drop      = document.getElementById("heroResults");
-  var aiBtn     = document.getElementById("heroAiBtn");
-  var kbdHint   = document.getElementById("heroKbd");
-  var searchTO;
+  (function () {
+    var heroSearch = document.getElementById("heroSearch");
+    var drop = document.getElementById("heroResults");
+    var aiBtn = document.getElementById("heroAiBtn");
+    var kbdHint = document.getElementById("heroKbd");
+    var searchTO;
 
-  drop.style.cssText =
-    "display:none;position:absolute;top:66px;left:0;right:0;" +
-    "background:var(--surface);color:var(--text);text-align:left;" +
-    "border:1px solid var(--border);border-radius:10px;" +
-    "box-shadow:0 8px 32px rgba(28,18,74,.18);" +
-    "overflow:hidden;max-height:420px;overflow-y:auto;z-index:200";
+    drop.style.cssText =
+      "display:none;position:absolute;top:66px;left:0;right:0;" +
+      "background:var(--surface);color:var(--text);text-align:left;" +
+      "border:1px solid var(--border);border-radius:10px;" +
+      "box-shadow:0 8px 32px rgba(28,18,74,.18);" +
+      "overflow:hidden;max-height:420px;overflow-y:auto;z-index:200";
 
-  function esc(s) {
-    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
+    function esc(s) {
+      return s
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
 
-  function confBadge(pct) {
-    var cls = pct >= 75 ? 'conf-high' : (pct >= 50 ? 'conf-med' : 'conf-low');
-    return '<span class="conf-badge ' + cls + '">' + pct + '%</span>';
-  }
+    function confBadge(pct) {
+      var cls = pct >= 75 ? "conf-high" : pct >= 50 ? "conf-med" : "conf-low";
+      return '<span class="conf-badge ' + cls + '">' + pct + "%</span>";
+    }
 
-  // Show AI button when input has enough text, hide ⌘K hint
-  function syncAiBtn() {
-    var hasText = heroSearch.value.trim().length >= 2;
-    aiBtn.style.display = hasText ? 'block' : 'none';
-    kbdHint.style.display = hasText ? 'none' : '';
-    heroSearch.style.paddingRight = hasText ? '62px' : '50px';
-  }
+    // Show AI button when input has enough text, hide ⌘K hint
+    function syncAiBtn() {
+      var hasText = heroSearch.value.trim().length >= 5;
+      aiBtn.style.display = hasText ? "block" : "none";
+      kbdHint.style.display = hasText ? "none" : "";
+      heroSearch.style.paddingRight = hasText ? "62px" : "50px";
+    }
 
-  // ---- keyword search (on keystroke) ----
-  heroSearch.addEventListener("input", function () {
-    syncAiBtn();
-    clearTimeout(searchTO);
-    var q = heroSearch.value.trim();
-    if (q.length < 2) { drop.style.display = "none"; return; }
-    searchTO = setTimeout(function () {
-      fetch("/search?q=" + encodeURIComponent(q))
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
-          if (!data.length) {
-            drop.innerHTML = '<div class="sr-head">No results for "' + esc(q) + '"</div>';
-          } else {
-            var h = '<div class="sr-head">' + data.length + ' result' + (data.length > 1 ? 's' : '') + ' for "' + esc(q) + '"</div>';
-            data.forEach(function (r) {
-              h += '<a class="sr-item" href="' + esc(r.url) + '">' +
-                '<div class="crumb">' + esc(r.crumb) + '</div>' +
-                '<div class="t">' + r.title + '</div>' +
-                '<div class="c">' + esc(r.excerpt) + '</div>' +
-                '</a>';
-            });
-            drop.innerHTML = h;
-          }
-          drop.style.display = "block";
-        })
-        .catch(function () { drop.style.display = "none"; });
-    }, 250);
-  });
-
-  // ---- AI search (on button click) ----
-  aiBtn.addEventListener("click", function () {
-    var q = heroSearch.value.trim();
-    if (q.length < 5) return;
-    clearTimeout(searchTO);
-    aiBtn.classList.add("busy");
-    aiBtn.textContent = "…";
-    drop.innerHTML = '<div class="sr-ai-loading"><div class="sr-spin"></div>Searching with AI…</div>';
-    drop.style.display = "block";
-
-    fetch("/api/ask?q=" + encodeURIComponent(q))
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
-        aiBtn.classList.remove("busy");
-        aiBtn.textContent = "AI";
-        var html = '';
-        if (data.answer) {
-          var topConf = (data.sources && data.sources.length) ? (data.sources[0].confidence || 0) : 0;
-          html += '<div class="sr-ai-answer">' +
-            '<div class="sr-ai-label">AI Answer' + (topConf ? ' ' + confBadge(topConf) : '') + '</div>' +
-            '<div class="sr-ai-text">' + esc(data.answer) + '</div>' +
-            '</div>';
-        }
-        if (data.sources && data.sources.length) {
-          html += '<div class="sr-head">' + data.sources.length + ' source' + (data.sources.length !== 1 ? 's' : '') + '</div>';
-          data.sources.forEach(function (s) {
-            var pct = s.confidence || 0;
-            html += '<a class="sr-item" href="' + esc(s.url) + '">' +
-              '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">' +
-              '<div class="crumb">' + esc(s.crumb) + '</div>' +
-              confBadge(pct) +
-              '</div>' +
-              '<div class="t">' + esc(s.title) + '</div>' +
-              '<div class="c">' + esc(s.excerpt) + '</div>' +
-              '</a>';
+    // ---- keyword search (on keystroke) ----
+    heroSearch.addEventListener("input", function () {
+      syncAiBtn();
+      clearTimeout(searchTO);
+      var q = heroSearch.value.trim();
+      if (q.length < 2) {
+        drop.style.display = "none";
+        return;
+      }
+      searchTO = setTimeout(function () {
+        fetch("/search?q=" + encodeURIComponent(q))
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (data) {
+            if (!data.length) {
+              drop.innerHTML =
+                '<div class="sr-head">No results for "' + esc(q) + '"</div>';
+            } else {
+              var h =
+                '<div class="sr-head">' +
+                data.length +
+                " result" +
+                (data.length > 1 ? "s" : "") +
+                ' for "' +
+                esc(q) +
+                '"</div>';
+              data.forEach(function (r) {
+                h +=
+                  '<a class="sr-item" href="' +
+                  esc(r.url) +
+                  '">' +
+                  '<div class="crumb">' +
+                  esc(r.crumb) +
+                  "</div>" +
+                  '<div class="t">' +
+                  r.title +
+                  "</div>" +
+                  '<div class="c">' +
+                  esc(r.excerpt) +
+                  "</div>" +
+                  "</a>";
+              });
+              drop.innerHTML = h;
+            }
+            drop.style.display = "block";
+          })
+          .catch(function () {
+            drop.style.display = "none";
           });
-        }
-        if (!html) html = '<div class="sr-head">' + esc(data.error || 'No results found.') + '</div>';
-        drop.innerHTML = html;
-      })
-      .catch(function () {
-        aiBtn.classList.remove("busy");
-        aiBtn.textContent = "AI";
-        drop.innerHTML = '<div class="sr-head">AI search failed. Try again.</div>';
-      });
-  });
+      }, 250);
+    });
 
-  document.addEventListener("click", function (e) {
-    if (!heroSearch.parentElement.contains(e.target))
-      drop.style.display = "none";
-  });
-})();
+    // ---- AI search (on button click) ----
+    aiBtn.addEventListener("click", function () {
+      var q = heroSearch.value.trim();
+      if (q.length < 5) return;
+      clearTimeout(searchTO);
+      aiBtn.classList.add("busy");
+      aiBtn.textContent = "…";
+      drop.innerHTML =
+        '<div class="sr-ai-loading"><div class="sr-spin"></div>Searching with AI…</div>';
+      drop.style.display = "block";
+
+      fetch("/api/ask?q=" + encodeURIComponent(q))
+        .then(function (r) {
+          return r.json();
+        })
+        .then(function (data) {
+          aiBtn.classList.remove("busy");
+          aiBtn.textContent = "AI";
+          var html = "";
+          if (data.answer) {
+            var topConf =
+              data.sources && data.sources.length
+                ? data.sources[0].confidence || 0
+                : 0;
+            html +=
+              '<div class="sr-ai-answer">' +
+              '<div class="sr-ai-label">AI Answer' +
+              (topConf ? " " + confBadge(topConf) : "") +
+              "</div>" +
+              '<div class="sr-ai-text">' +
+              esc(data.answer) +
+              "</div>" +
+              "</div>";
+          }
+          if (data.sources && data.sources.length) {
+            html +=
+              '<div class="sr-head">' +
+              data.sources.length +
+              " source" +
+              (data.sources.length !== 1 ? "s" : "") +
+              "</div>";
+            data.sources.forEach(function (s) {
+              var pct = s.confidence || 0;
+              html +=
+                '<a class="sr-item" href="' +
+                esc(s.url) +
+                '">' +
+                '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">' +
+                '<div class="crumb">' +
+                esc(s.crumb) +
+                "</div>" +
+                confBadge(pct) +
+                "</div>" +
+                '<div class="t">' +
+                esc(s.title) +
+                "</div>" +
+                '<div class="c">' +
+                esc(s.excerpt) +
+                "</div>" +
+                "</a>";
+            });
+          }
+          if (!html)
+            html =
+              '<div class="sr-head">' +
+              esc(data.error || "No results found.") +
+              "</div>";
+          drop.innerHTML = html;
+        })
+        .catch(function () {
+          aiBtn.classList.remove("busy");
+          aiBtn.textContent = "AI";
+          drop.innerHTML =
+            '<div class="sr-head">AI search failed. Try again.</div>';
+        });
+    });
+
+    document.addEventListener("click", function (e) {
+      if (!heroSearch.parentElement.contains(e.target))
+        drop.style.display = "none";
+    });
+  })();
 </script>
 {% endblock %}
